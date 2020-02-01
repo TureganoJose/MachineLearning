@@ -1,0 +1,115 @@
+#https://arxiv.org/pdf/1905.01697.pdf
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras.layers import Dense, Flatten, Conv2D, DepthwiseConv2D, MaxPool2D
+from tensorflow.keras import regularizers
+from tensorflow.keras import Model
+
+def plot_axis(ax, x, y, title):
+    ax.plot(x, y)
+    ax.set_title(title)
+    ax.xaxis.set_visible(False)
+    ax.set_ylim([min(y) - np.std(y), max(y) + np.std(y)])
+    ax.set_xlim([min(x), max(x)])
+    ax.grid(True)
+
+segments = np.load('segments.npy')
+labels = np.load('labels.npy')
+
+reshaped_segments = segments.reshape(len(segments), 3, 90, 1)
+
+train_test_split = np.random.rand(len(reshaped_segments)) < 0.70
+train_x = reshaped_segments[train_test_split]
+train_y = labels[train_test_split]
+test_x = reshaped_segments[~train_test_split]
+test_y = labels[~train_test_split]
+
+Train_Batch_size = train_x.shape
+batch_size = Train_Batch_size[0]
+
+input_height = 1
+input_width = 90
+num_labels = 6
+num_channels = 3
+
+kernel_size = 60
+depth = 60
+num_hidden = 1000
+
+learning_rate = 0.001
+training_epochs = 100
+
+# Float64 by default in layers
+tf.keras.backend.set_floatx('float64')
+
+
+model = keras.models.Sequential()
+
+# Dilation layer 1
+model.add(keras.layers.Conv2D(32, (3, 10), strides=(1, 1), padding='same', data_format='channels_last', dilation_rate=(1, 2),
+                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5),
+                              input_shape=(3, 90, 1)))
+model.add(keras.layers.Conv2D(32, (1, 2), strides=(1, 2), padding='same', data_format=None, dilation_rate=(1, 1),
+                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5)))
+# Dilation layer 2
+model.add(keras.layers.Conv2D(32, (3, 3), strides=(1, 1), padding='same', data_format=None, dilation_rate=(1, 2),
+                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5)))
+model.add(keras.layers.Conv2D(32, (1, 2), strides=(1, 2), padding='same', data_format=None, dilation_rate=(1, 1),
+                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5)))
+# Dilation layer 3
+model.add(keras.layers.Conv2D(64, (3, 3), strides=(1, 1), padding='same', data_format=None, dilation_rate=(1, 1),
+                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5)))
+model.add(keras.layers.Conv2D(64, (1, 2), strides=(1, 2), padding='same', data_format=None, dilation_rate=(1, 1),
+                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5)))
+# Fully connected
+model.add(Flatten())
+model.add(Dense(512, activation='softmax'))
+model.add(Dense(6, activation='softmax'))
+
+model.summary()
+
+model.compile(loss=keras.losses.categorical_crossentropy,
+              optimizer=keras.optimizers.Nadam(lr=learning_rate),
+              metrics=['accuracy'])
+
+history = model.fit(train_x, train_y,
+          batch_size=batch_size,
+          epochs=training_epochs,
+          verbose=1,
+          validation_data=(test_x, test_y))
+
+score = model.evaluate(test_x, test_y, verbose=0)
+print('Test loss:', score[0])
+print('Test accuracy:', score[1])
+
+# list all data in history
+print(history.history.keys())
+# summarize history for accuracy
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+# summarize history for loss
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+
