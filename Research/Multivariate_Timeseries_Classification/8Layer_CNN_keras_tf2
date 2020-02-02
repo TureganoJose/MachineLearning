@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras.layers import Dense, Flatten, Conv2D, DepthwiseConv2D, MaxPool2D
+from tensorflow.keras.layers import Dense, Flatten, Conv2D, DepthwiseConv2D, MaxPool2D, Input
 from tensorflow.keras import regularizers
 from tensorflow.keras import Model
 
@@ -19,10 +19,48 @@ def plot_axis(ax, x, y, title):
     ax.set_xlim([min(x), max(x)])
     ax.grid(True)
 
+def cnn_layers(model_input):
+    # Dilation layer 1
+    x = keras.layers.Conv2D(32, (3, 10), strides=(1, 1), padding='same', data_format='channels_last', dilation_rate=(1, 2),
+                            activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                            bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5))(model_input)
+    x = keras.layers.Conv2D(32, (1, 2), strides=(1, 2), padding='same', data_format=None, dilation_rate=(1, 1),
+                            activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                            bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5))(x)
+    # Dilation layer 2
+    x = keras.layers.Conv2D(32, (3, 3), strides=(1, 1), padding='same', data_format=None, dilation_rate=(1, 2),
+                            activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                            bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5))(x)
+    x = keras.layers.Conv2D(32, (1, 2), strides=(1, 2), padding='same', data_format=None, dilation_rate=(1, 1),
+                            activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                            bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5))(x)
+    # Dilation layer 3
+    x = keras.layers.Conv2D(64, (3, 3), strides=(1, 1), padding='same', data_format=None, dilation_rate=(1, 1),
+                            activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                            bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5))(x)
+    x = keras.layers.Conv2D(64, (1, 2), strides=(1, 2), padding='same', data_format=None, dilation_rate=(1, 1),
+                            activation=None, use_bias=True, kernel_initializer='glorot_uniform',
+                            bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5))(x)
+    # Fully connected
+    x = Flatten()(x)
+    x = Dense(512, activation='softmax')(x)
+    prediction = Dense(6, activation='softmax')(x)
+    return prediction
+
+# Check that it detects my GPU
+#tf.test.is_built_with_cuda()
+
+#tf.config.list_physical_devices('GPU')
+
+#tf.test.is_gpu_available(cuda_only=False, min_cuda_compute_capability=None)
+
+# Pre-processing data
 segments = np.load('segments.npy')
 labels = np.load('labels.npy')
 
 reshaped_segments = segments.reshape(len(segments), 3, 90, 1)
+#mod_segment = segments.swapaxes(2, 0)
+#reshaped_segments = segments.reshape(len(mod_segment), 3, 90, 1)
 
 train_test_split = np.random.rand(len(reshaped_segments)) < 0.70
 train_x = reshaped_segments[train_test_split]
@@ -30,8 +68,15 @@ train_y = labels[train_test_split]
 test_x = reshaped_segments[~train_test_split]
 test_y = labels[~train_test_split]
 
+# Creating dataset https://keras.io/examples/mnist_dataset_api/
+
+dataset = tf.data.Dataset.from_tensor_slices((train_x, train_y))
+#dataset = dataset.repeat()
+#dataset = dataset.shuffle(buffer_size)
 Train_Batch_size = train_x.shape
-batch_size = Train_Batch_size[0]
+batch_size = int(Train_Batch_size[0]/100)
+dataset = dataset.batch(batch_size)
+iterator = iter(dataset)
 
 input_height = 1
 input_width = 90
@@ -48,49 +93,25 @@ training_epochs = 100
 # Float64 by default in layers
 tf.keras.backend.set_floatx('float64')
 
+inputs, targets = iterator.get_next()
+model_input = inputs
+model_output = cnn_layers(model_input)
 
-model = keras.models.Sequential()
+#train_model = keras.models.Model(inputs=model_input, outputs=model_output)
 
-# Dilation layer 1
-model.add(keras.layers.Conv2D(32, (3, 10), strides=(1, 1), padding='same', data_format='channels_last', dilation_rate=(1, 2),
-                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
-                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5),
-                              input_shape=(3, 90, 1)))
-model.add(keras.layers.Conv2D(32, (1, 2), strides=(1, 2), padding='same', data_format=None, dilation_rate=(1, 1),
-                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
-                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5)))
-# Dilation layer 2
-model.add(keras.layers.Conv2D(32, (3, 3), strides=(1, 1), padding='same', data_format=None, dilation_rate=(1, 2),
-                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
-                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5)))
-model.add(keras.layers.Conv2D(32, (1, 2), strides=(1, 2), padding='same', data_format=None, dilation_rate=(1, 1),
-                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
-                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5)))
-# Dilation layer 3
-model.add(keras.layers.Conv2D(64, (3, 3), strides=(1, 1), padding='same', data_format=None, dilation_rate=(1, 1),
-                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
-                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5)))
-model.add(keras.layers.Conv2D(64, (1, 2), strides=(1, 2), padding='same', data_format=None, dilation_rate=(1, 1),
-                              activation=None, use_bias=True, kernel_initializer='glorot_uniform',
-                              bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5)))
-# Fully connected
-model.add(Flatten())
-model.add(Dense(512, activation='softmax'))
-model.add(Dense(6, activation='softmax'))
+train_model.compile(loss=keras.losses.categorical_crossentropy,
+                    optimizer=keras.optimizers.Nadam(lr=learning_rate),
+                    metrics=['accuracy'])
 
-model.summary()
+train_model.summary()
 
-model.compile(loss=keras.losses.categorical_crossentropy,
-              optimizer=keras.optimizers.Nadam(lr=learning_rate),
-              metrics=['accuracy'])
-
-history = model.fit(train_x, train_y,
+history = train_model.fit(train_x, train_y,
           batch_size=batch_size,
           epochs=training_epochs,
           verbose=1,
           validation_data=(test_x, test_y))
 
-score = model.evaluate(test_x, test_y, verbose=0)
+score = train_model.evaluate(test_x, test_y, verbose=0)
 print('Test loss:', score[0])
 print('Test accuracy:', score[1])
 

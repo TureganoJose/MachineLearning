@@ -57,14 +57,16 @@ def windows(data, size):
 
 
 def segment_signal(data, window_size=90):
-    segments = np.empty((0, window_size, 3))
+    # segments = np.empty((0, window_size, 3)) # segment shape 1,90,3 -> 3 layers
+    segments = np.empty((3, window_size, 0))  # segment shape 3,90,1-> 8 layers
     labels = np.empty((0))
     for (start, end) in windows(data["timestamp"], window_size):
         x = data["x-axis"][start:end]
         y = data["y-axis"][start:end]
         z = data["z-axis"][start:end]
         if (len(dataset["timestamp"][start:end]) == window_size):
-            segments = np.vstack([segments, np.dstack([x, y, z])])
+            segments = np.dstack([segments, np.vstack([x, y, z])]) # segment shape 3,90,1 -> 8 layers
+            # segments = np.vstack([segments, np.dstack([x, y, z])]) # segment shape 1,90,3 -> 3 layers
             labels = np.append(labels, stats.mode(data["activity"][start:end])[0][0])
     return segments, labels
 
@@ -85,6 +87,6 @@ dataset['z-axis'] = feature_normalize(dataset['z-axis'])
 
 segments, labels = segment_signal(dataset)
 labels = np.asarray(pd.get_dummies(labels), dtype = np.int8)
-reshaped_segments = segments.reshape(len(segments), 1,90, 3)
-np.save('labels', labels)
-np.save('segments', segments)
+# reshaped_segments = segments.reshape(len(segments), 1,90, 3)
+np.save('labels_trans', labels)
+np.save('segments_trans', segments)
