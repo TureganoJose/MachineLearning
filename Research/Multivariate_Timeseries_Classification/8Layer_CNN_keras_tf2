@@ -75,8 +75,15 @@ dataset = tf.data.Dataset.from_tensor_slices((train_x, train_y))
 #dataset = dataset.shuffle(buffer_size)
 Train_Batch_size = train_x.shape
 batch_size = int(Train_Batch_size[0]/100)
-dataset = dataset.batch(batch_size)
-iterator = iter(dataset)
+dataset = dataset.batch(batch_size, drop_remainder=True)
+dataset = dataset.prefetch(1)
+
+dataset_val = tf.data.Dataset.from_tensor_slices((test_x, test_y))
+dataset_val = dataset_val.batch(batch_size, drop_remainder=True)
+dataset_val = dataset_val.prefetch(1)
+
+
+#iterator = iter(dataset)
 
 input_height = 1
 input_width = 90
@@ -87,16 +94,15 @@ kernel_size = 60
 depth = 60
 num_hidden = 1000
 
-learning_rate = 0.001
-training_epochs = 100
+learning_rate = 0.0001
+training_epochs = 30
 
 # Float64 by default in layers
 tf.keras.backend.set_floatx('float64')
 
-inputs, targets = iterator.get_next()
-model_input = inputs
+model_input = Input(shape=(3, 90, 1))
 model_output = cnn_layers(model_input)
-
+train_model = Model(inputs=model_input, outputs=model_output)
 #train_model = keras.models.Model(inputs=model_input, outputs=model_output)
 
 train_model.compile(loss=keras.losses.categorical_crossentropy,
@@ -105,11 +111,10 @@ train_model.compile(loss=keras.losses.categorical_crossentropy,
 
 train_model.summary()
 
-history = train_model.fit(train_x, train_y,
-          batch_size=batch_size,
+history = train_model.fit(dataset,
           epochs=training_epochs,
           verbose=1,
-          validation_data=(test_x, test_y))
+          validation_data = dataset_val)
 
 score = train_model.evaluate(test_x, test_y, verbose=0)
 print('Test loss:', score[0])
