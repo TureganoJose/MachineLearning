@@ -24,7 +24,7 @@ def cnn_layers(model_input):
     x = keras.layers.Conv2D(32, (3, 10), strides=(1, 1), padding='same', data_format='channels_last', dilation_rate=(1, 2),
                             activation=None, use_bias=True, kernel_initializer='glorot_uniform',
                             bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5))(model_input)
-    x = keras.layers.Conv2D(32, (1, 2), strides=(1, 2), padding='same', data_format=None, dilation_rate=(1, 1),
+    x = keras.layers.Conv2D(32, (1, 2), strides=(1, 2), padding='valid', data_format=None, dilation_rate=(1, 1),
                             activation=None, use_bias=True, kernel_initializer='glorot_uniform',
                             bias_initializer='zeros', kernel_regularizer=regularizers.l2(1e-5))(x)
     # Dilation layer 2
@@ -55,18 +55,33 @@ def cnn_layers(model_input):
 #tf.test.is_gpu_available(cuda_only=False, min_cuda_compute_capability=None)
 
 # Pre-processing data
-segments = np.load('segments.npy')
-labels = np.load('labels.npy')
+#segments = np.load('segments.npy')
+#labels = np.load('labels.npy')
+#
+#reshaped_segments = segments.reshape(len(segments), 3, 90, 1)
+##mod_segment = segments.swapaxes(2, 0)
+##reshaped_segments = segments.reshape(len(mod_segment), 3, 90, 1)
+#
+#train_test_split = np.random.rand(len(reshaped_segments)) < 0.70
+#train_x = reshaped_segments[train_test_split]
+#train_y = labels[train_test_split]
+#test_x = reshaped_segments[~train_test_split]
+#test_y = labels[~train_test_split]
 
-reshaped_segments = segments.reshape(len(segments), 3, 90, 1)
-#mod_segment = segments.swapaxes(2, 0)
-#reshaped_segments = segments.reshape(len(mod_segment), 3, 90, 1)
 
-train_test_split = np.random.rand(len(reshaped_segments)) < 0.70
-train_x = reshaped_segments[train_test_split]
-train_y = labels[train_test_split]
-test_x = reshaped_segments[~train_test_split]
-test_y = labels[~train_test_split]
+
+train_x = np.load('TRAIN_feat_sp_v2_200.npy')
+train_y = np.load('TRAIN_label_sp_v2_200.npy')
+
+train_x = train_x.transpose(0, 2, 1)
+
+test_x = np.load('TEST_feat_sp_v2_200.npy')
+test_y = np.load('TEST_label_sp_v2_200.npy')
+
+test_x = test_x.transpose(0, 2, 1)
+
+train_x = np.expand_dims(train_x, axis=3)
+test_x = np.expand_dims(test_x, axis=3)
 
 # Creating dataset https://keras.io/examples/mnist_dataset_api/
 
@@ -95,12 +110,12 @@ depth = 60
 num_hidden = 1000
 
 learning_rate = 0.0001
-training_epochs = 30
+training_epochs = 300
 
 # Float64 by default in layers
 tf.keras.backend.set_floatx('float64')
 
-model_input = Input(shape=(3, 90, 1))
+model_input = Input(shape=(200, 3, 1))
 model_output = cnn_layers(model_input)
 train_model = Model(inputs=model_input, outputs=model_output)
 #train_model = keras.models.Model(inputs=model_input, outputs=model_output)
